@@ -1,0 +1,81 @@
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+import joblib # Library to save our models
+
+print("--- Script Started: Training and Saving Models ---")
+
+# 1. Load Data
+filepath = r'C:\Users\LENOVO\Downloads\Project final\data\FinalBalancedDataset.csv'
+df = pd.read_csv(filepath)
+df.dropna(subset=['tweet'], inplace=True)
+
+print("Step 1/5: Data loaded successfully.")
+
+# 2. Split Data
+X = df['tweet']
+y = df['Toxicity']
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+
+print("Step 2/5: Data split into training and testing sets.")
+
+# 3. Create and Fit Vectorizers
+vectorizer_bow = CountVectorizer()
+X_train_bow = vectorizer_bow.fit_transform(X_train)
+
+vectorizer_tfidf = TfidfVectorizer()
+X_train_tfidf = vectorizer_tfidf.fit_transform(X_train)
+
+print("Step 3/5: Text vectorizers (BoW, TF-IDF) have been fitted.")
+
+# 4. Train All Models
+models_to_train = {
+    "Decision Tree": DecisionTreeClassifier(random_state=42),
+    "Random Forest": RandomForestClassifier(random_state=42),
+    "Naive Bayes": MultinomialNB(),
+    "K-NN Classifier": KNeighborsClassifier(),
+    "SVM": SVC(probability=True, random_state=42)
+}
+
+trained_models = {"Bag of Words": {}, "TF-IDF": {}}
+
+print("Step 4/5: Starting model training... (This is the slow part)")
+
+for name, model in models_to_train.items():
+    # Train with Bag of Words
+    m_bow = model.fit(X_train_bow, y_train)
+    trained_models["Bag of Words"][name] = m_bow
+    print(f"  - Trained {name} with Bag of Words.")
+    
+    # Create a new instance for TF-IDF to be safe
+    model_for_tfidf = model.__class__(**model.get_params())
+    if 'probability' in model.get_params():
+         model_for_tfidf.probability = True
+    
+    # Train with TF-IDF
+    m_tfidf = model_for_tfidf.fit(X_train_tfidf, y_train)
+    trained_models["TF-IDF"][name] = m_tfidf
+    print(f"  - Trained {name} with TF-IDF.")
+
+print("Model training complete.")
+
+# 5. Bundle everything into a single file for easy loading
+artifacts = {
+    "vectorizers": {"Bag of Words": vectorizer_bow, "TF-IDF": vectorizer_tfidf},
+    "models": trained_models,
+    "X_test": X_test,
+    "y_test": y_test
+}
+
+# Save the artifacts file
+output_filename = "ml_artifacts.joblib"
+joblib.dump(artifacts, output_filename)
+
+print(f"\n--- Script Finished ---")
+print(f"All models and data have been saved to '{output_filename}'.")
+print("You can now run the Streamlit app.")
